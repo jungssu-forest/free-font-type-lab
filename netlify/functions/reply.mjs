@@ -1,4 +1,4 @@
-// 주현호 「털어 놓아봐」 AI 답장 함수
+// 주현호 「털어 놓아봐」(동글주현호체) AI 답장 함수
 // Netlify 환경 변수 ANTHROPIC_API_KEY 가 필요해요.
 import { getStore } from "@netlify/blobs";
 
@@ -21,38 +21,51 @@ const prompt = (msg) => `너는 강 건너편에서 종이배에 답장을 실�
 보낸 글:
 ${msg}`;
 
+const MODEL = () => process.env.ANTHROPIC_MODEL || "claude-haiku-5-5";
+
+// Claude 호출 (8초 안에 답이 없으면 포기하고 미리 써 둔 편지로)
+async function callClaude(content, maxTokens){
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST", signal: ctrl.signal,
+      headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model: MODEL(), max_tokens: maxTokens, messages: [{ role: "user", content }] }),
+    });
+    const data = await r.json().catch(() => ({}));
+    return { ok: r.ok, status: r.status, data };
+  } catch (e) {
+    return { ok: false, status: 0, data: { error: { type: e.name === "AbortError" ? "timeout" : "network", message: String(e.message || e) } } };
+  } finally { clearTimeout(t); }
+}
+
 export default async (req, context) => {
+  // 연결 점검: 브라우저에서 /api/reply 를 열면 상태를 보여 줘요 (키 값은 절대 보여 주지 않아요)
+  if (req.method === "GET") {
+    const has = !!process.env.ANTHROPIC_API_KEY;
+    if (!has) return Response.json({ key: "없음 — Netlify 환경 변수 ANTHROPIC_API_KEY 를 확인하세요" });
+    const r = await callClaude("안녕이라고만 답해.", 10);
+    return Response.json({ key: "있음", model: MODEL(), ok: r.ok, status: r.status, error: r.ok ? null : (r.data.error || r.data) });
+  }
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
   let msg = "";
   try { msg = String((await req.json()).msg || "").slice(0, 1000).trim(); } catch {}
   if (!msg) return Response.json({ error: "empty" }, { status: 400 });
-  if (!process.env.ANTHROPIC_API_KEY) return Response.json({ error: "no key" }, { status: 500 });
+  if (!process.env.ANTHROPIC_API_KEY) { console.error("reply: ANTHROPIC_API_KEY 없음"); return Response.json({ error: "no key" }, { status: 500 }); }
 
   // 사용량 제한
-  const store = getStore("reply-limits");
+  const store = getStore({ name: "reply-limits", consistency: "strong" });
   const now = new Date();
   const hourKey = `ip/${context.ip || "unknown"}/${now.toISOString().slice(0, 13)}`;
   const dayKey = `day/${now.toISOString().slice(0, 10)}`;
   const [h, d] = await Promise.all([store.get(hourKey, { type: "json" }), store.get(dayKey, { type: "json" })]);
   if ((h || 0) >= PER_HOUR || (d || 0) >= PER_DAY) return Response.json({ error: "busy" }, { status: 429 });
-  await Promise.all([store.setJSON(hourKey, (h || 0) + 1), store.setJSON(dayKey, (d || 0) + 1)]);
+  const counted = Promise.all([store.setJSON(hourKey, (h || 0) + 1), store.setJSON(dayKey, (d || 0) + 1)]);
 
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: process.env.ANTHROPIC_MODEL || "claude-haiku-5-5",
-      max_tokens: 400,
-      messages: [{ role: "user", content: prompt(msg) }],
-    }),
-  });
-  if (!r.ok) return Response.json({ error: "ai" }, { status: 502 });
-  const data = await r.json();
-  const text = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
+  const r = await callClaude(prompt(msg), 300);
+  await counted;
+  if (!r.ok){ console.error("reply: Claude 오류", r.status, JSON.stringify(r.data.error || r.data).slice(0, 300)); return Response.json({ error: "ai", status: r.status }, { status: 502 }); }
+  const text = (r.data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("").trim();
   return Response.json({ text });
 };
 

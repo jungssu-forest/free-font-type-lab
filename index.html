@@ -914,10 +914,10 @@ const CATS = ["전체","한글","영문","실험적","인터랙티브"];
 
 /* 작품 번호별 폰트 파일 (화면 표시 + 다운로드) */
 const FONT_FILES = {
-  "01": { family:"KimEunbin", ttf:{ file:"fonts/KimEunbin-Regular.ttf" }, otf:{ file:"fonts/KimEunbin-Regular.otf" } },
-  "02": { family:"KimGaeun", ttf:{ file:"fonts/KimGaeun-Regular.ttf" }, otf:{ file:"fonts/KimGaeun-Regular.otf" } },
-  "03": { family:"JuHyeonho", ttf:{ file:"fonts/JuHyeonho-Regular.ttf" }, otf:{ file:"fonts/JuHyeonho-Regular.otf" } },
-  "04": { family:"NaHyorin", ttf:{ file:"fonts/NaHyorin-Regular.ttf" }, otf:{ file:"fonts/NaHyorin-Regular.otf" } },
+  "01": { family:"KimEunbin", woff2:"fonts/KimEunbin-Regular.woff2", ttf:{ file:"fonts/KimEunbin-Regular.ttf" }, otf:{ file:"fonts/KimEunbin-Regular.otf" } },
+  "02": { family:"KimGaeun", woff2:"fonts/KimGaeun-Regular.woff2", ttf:{ file:"fonts/KimGaeun-Regular.ttf" }, otf:{ file:"fonts/KimGaeun-Regular.otf" } },
+  "03": { family:"JuHyeonho", woff2:"fonts/JuHyeonho-Regular.woff2", ttf:{ file:"fonts/JuHyeonho-Regular.ttf" }, otf:{ file:"fonts/JuHyeonho-Regular.otf" } },
+  "04": { family:"NaHyorin", woff2:"fonts/NaHyorin-Regular.woff2", ttf:{ file:"fonts/NaHyorin-Regular.ttf" }, otf:{ file:"fonts/NaHyorin-Regular.otf" } },
 };
 /* ─────────────────────────────────────────────── */
 
@@ -1655,7 +1655,7 @@ const fontBytes = (id, fmt) => Uint8Array.from(atob(FONT_FILES[id][fmt].b64), c 
 Object.keys(FONT_FILES).forEach(id => {
   const ff = FONT_FILES[id], t = ff.ttf;
   try {
-    const src = t.b64 ? fontBytes(id,"ttf").buffer : `url("${encodeURI(t.file)}")`;
+    const src = t.b64 ? fontBytes(id,"ttf").buffer : (ff.woff2 ? `url("${encodeURI(ff.woff2)}") format("woff2"), url("${encodeURI(t.file)}")` : `url("${encodeURI(t.file)}")`);
     new FontFace(ff.family, src).load().then(x => { document.fonts.add(x); fitSpecs(); setTimeout(fitSpecs, 300); }).catch(() => {});
   } catch(e){}
 });

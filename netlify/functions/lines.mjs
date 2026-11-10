@@ -1,4 +1,4 @@
-// 김가은 「Lace letters」 함께 쓴 문장 저장 함수 (Netlify Blobs 사용, 추가 가입 필요 없음)
+// 김가은 「Lacerif」 함께 쓴 문장 저장 함수 (Netlify Blobs 사용, 추가 가입 필요 없음)
 import { getStore } from "@netlify/blobs";
 
 const MAX_PER_PERSON = 8;   // 한 사람당 남는 문장 수
@@ -6,7 +6,7 @@ const MAX_LEN = 120;        // 문장 최대 길이
 const okId = (v) => typeof v === "string" && /^[A-Za-z0-9.-]{8,64}$/.test(v);
 
 export default async (req, context) => {
-  const store = getStore("lace-lines");
+  const store = getStore({ name: "lace-lines", consistency: "strong" });   // 쓰자마자 바로 보이도록
 
   if (req.method === "GET") {
     const { blobs } = await store.list({ prefix: "u/" });
