@@ -204,5 +204,6 @@ load();setInterval(()=>{if(!document.hidden)load()},10000);
 render();
 })();
 </script>
+<script>try{if(/^https?:$/.test(location.protocol)&&!/claude/.test(location.hostname))navigator.sendBeacon("/api/hit",JSON.stringify({p:"site-02"}))}catch(e){}</script>
 </body>
 </html>

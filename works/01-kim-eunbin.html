@@ -704,5 +704,6 @@ function frame(t){idleTwitch(t);drawBg(t);drawGlitch(t);drawRays(t);updateLens(t
 resize();requestAnimationFrame(frame);
 (document.fonts?document.fonts.ready:Promise.resolve()).then(()=>setTimeout(()=>{if(!input.value) demo("Virtual Angel")},400));
 </script>
+<script>try{if(/^https?:$/.test(location.protocol)&&!/claude/.test(location.hostname))navigator.sendBeacon("/api/hit",JSON.stringify({p:"site-01"}))}catch(e){}</script>
 </body>
 </html>

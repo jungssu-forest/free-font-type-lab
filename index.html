@@ -1620,8 +1620,17 @@ function scanTransition(){
   clearTimeout(scanTransition.t);
   scanTransition.t = setTimeout(() => { sc.classList.remove("run"); app.classList.remove("scan-in"); }, 700);
 }
+/* 방문 기록 (관리용, 호스팅된 사이트에서만) */
+function trackView(r){
+  try {
+    if (!/^https?:$/.test(location.protocol) || /claude/.test(location.hostname) || !navigator.sendBeacon) return;
+    const p = (r || "#home").replace(/^#/, "").replace(/[^a-z0-9-]/gi, "").slice(0, 40) || "home";
+    navigator.sendBeacon("/api/hit", JSON.stringify({ p }));
+  } catch (e) {}
+}
 function navigate(){
   const r = location.hash || "#home";
+  if (r !== lastRoute) trackView(r);
   render();
   if (r !== lastRoute){ window.scrollTo(0,0); if (lastRoute !== null) scanTransition(); }
   lastRoute = r;

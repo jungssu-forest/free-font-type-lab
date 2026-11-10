@@ -620,5 +620,6 @@ snd.addEventListener('click',()=>{soundOn=!soundOn;snd.setAttribute('aria-presse
 document.addEventListener('visibilitychange',()=>{if(!actx)return;document.hidden?actx.suspend():(soundOn&&actx.resume())});
 })();
 </script>
+<script>try{if(/^https?:$/.test(location.protocol)&&!/claude/.test(location.hostname))navigator.sendBeacon("/api/hit",JSON.stringify({p:"site-03"}))}catch(e){}</script>
 </body>
 </html>
