@@ -24,16 +24,23 @@ ${msg}`;
 const MODEL = () => process.env.ANTHROPIC_MODEL || "claude-haiku-5-5";
 
 // Claude 호출 (9초 안에 답이 없으면 포기하고 미리 써 둔 편지로)
+// Haiku 5.5는 기본으로 먼저 '생각'을 하는데, 그 분량도 max_tokens에 포함돼요.
+// 짧은 편지에는 생각이 필요 없어서 끄고, 혹시 거절되면 생각을 켠 채 넉넉한 한도로 한 번 더 시도해요.
+async function post(body, signal){
+  const r = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST", signal,
+    headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+    body: JSON.stringify(body),
+  });
+  return { r, data: await r.json().catch(() => ({})) };
+}
 async function callClaude(content, maxTokens){
   const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 9000);
   const t0 = Date.now();
+  const messages = [{ role: "user", content }];
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST", signal: ctrl.signal,
-      headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify({ model: MODEL(), max_tokens: maxTokens, messages: [{ role: "user", content }] }),
-    });
-    const data = await r.json().catch(() => ({}));
+    let { r, data } = await post({ model: MODEL(), max_tokens: maxTokens, thinking: { type: "disabled" }, output_config: { effort: "low" }, messages }, ctrl.signal);
+    if (r.status === 400) ({ r, data } = await post({ model: MODEL(), max_tokens: 2000, output_config: { effort: "low" }, messages }, ctrl.signal));
     return { ok: r.ok, status: r.status, data, ms: Date.now() - t0 };
   } catch (e) {
     return { ok: false, status: 0, ms: Date.now() - t0, data: { error: { type: e.name === "AbortError" ? "timeout" : "network", message: String(e.message || e) } } };
@@ -62,9 +69,9 @@ export default async (req, context) => {
     const t0 = Date.now();
     const lim = await overLimit(context);
     const limitMs = Date.now() - t0;
-    const r = await callClaude(prompt("요즘 시험 때문에 잠을 잘 못 자."), 220);
+    const r = await callClaude(prompt("요즘 시험 때문에 잠을 잘 못 자."), 600);
     const text = r.ok ? textOf(r.data) : "";
-    return Response.json({ key: "있음", model: MODEL(), ok: r.ok && !!text, status: r.status, claudeMs: r.ms, limitMs, limitError: lim.err || null, sample: text || null, error: r.ok ? (text ? null : "빈 답장") : (r.data.error || r.data) });
+    return Response.json({ key: "있음", model: MODEL(), ok: r.ok && !!text, status: r.status, claudeMs: r.ms, limitMs, limitError: lim.err || null, stop: r.data.stop_reason || null, sample: text || null, error: r.ok ? (text ? null : "빈 답장") : (r.data.error || r.data) });
   }
   if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
   let msg = "";
@@ -75,7 +82,7 @@ export default async (req, context) => {
   const lim = await overLimit(context);
   if (lim.busy) return Response.json({ error: "busy" }, { status: 429 });
 
-  const r = await callClaude(prompt(msg), 220);
+  const r = await callClaude(prompt(msg), 600);
   const text = r.ok ? textOf(r.data) : "";
   if (!text){ console.error("reply: 실패", r.status, r.ms + "ms", JSON.stringify(r.data.error || r.data).slice(0, 300)); return Response.json({ error: "ai", status: r.status, type: (r.data.error && r.data.error.type) || "empty" }, { status: 502 }); }
   return Response.json({ text });
